@@ -180,13 +180,19 @@ type mobilePushState struct {
 	browser *testPushBrowser
 	push    *testPushService
 
+	// rec is what the server's goroutines write: one per scenario, so a late
+	// decision of a finished scenario never touches the next one's state.
+	rec      *mobilePushRecorder
+	turnDone chan error
+	turnOver chan struct{}
+	notice   pushNotice
+}
+
+type mobilePushRecorder struct {
 	mu        sync.Mutex
 	outcome   string
 	decisions []string
 	decided   chan struct{}
-	turnDone  chan error
-	turnOver  chan struct{}
-	notice    pushNotice
 }
 
 func (s *mobilePushState) reset() {
@@ -219,7 +225,8 @@ func (s *mobilePushState) reset() {
 
 func (s *mobilePushState) openServer(name string) error {
 	s.name = name
-	s.decided = make(chan struct{}, 16)
+	rec := &mobilePushRecorder{decided: make(chan struct{}, 64)}
+	s.rec = rec
 	home, err := os.MkdirTemp("", "coddy-mobile-home-*")
 	if err != nil {
 		return err
@@ -253,21 +260,24 @@ func (s *mobilePushState) openServer(name string) error {
 		if err != nil {
 			return string(acp.StopReasonCancelled), err
 		}
-		s.mu.Lock()
+		rec.mu.Lock()
 		if res != nil {
-			s.outcome = res.Outcome
+			rec.outcome = res.Outcome
 		}
-		s.mu.Unlock()
+		rec.mu.Unlock()
 		return string(acp.StopReasonEndTurn), nil
 	}
 	log := slog.New(slog.DiscardHandler)
 	s.mgr = session.NewManager(cfg, noopSender{}, runner, log, home, nil)
 	s.srv = New(cfg, s.mgr, log, home)
 	s.srv.push.decided = func(kind string, targets int) {
-		s.mu.Lock()
-		s.decisions = append(s.decisions, fmt.Sprintf("%s:%d", kind, targets))
-		s.mu.Unlock()
-		s.decided <- struct{}{}
+		rec.mu.Lock()
+		rec.decisions = append(rec.decisions, fmt.Sprintf("%s:%d", kind, targets))
+		rec.mu.Unlock()
+		select {
+		case rec.decided <- struct{}{}:
+		default:
+		}
 	}
 	s.ts = httptest.NewServer(s.srv.Handler())
 	res, err := s.mgr.HandleSessionNew(context.Background(), acp.SessionNewParams{CWD: home})
@@ -514,10 +524,10 @@ func (s *mobilePushState) turnAllowed() error {
 	case <-time.After(10 * time.Second):
 		return errors.New("the turn did not end")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.outcome != "allow" {
-		return fmt.Errorf("the command was answered %q", s.outcome)
+	s.rec.mu.Lock()
+	defer s.rec.mu.Unlock()
+	if s.rec.outcome != "allow" {
+		return fmt.Errorf("the command was answered %q", s.rec.outcome)
 	}
 	return nil
 }
@@ -527,10 +537,10 @@ func (s *mobilePushState) turnAllowed() error {
 func (s *mobilePushState) receivesNothing() error {
 	deadline := time.After(10 * time.Second)
 	for {
-		s.mu.Lock()
-		n := len(s.decisions)
-		got := strings.Join(s.decisions, ",")
-		s.mu.Unlock()
+		s.rec.mu.Lock()
+		n := len(s.rec.decisions)
+		got := strings.Join(s.rec.decisions, ",")
+		s.rec.mu.Unlock()
 		if n >= 2 {
 			if got != "permission:0,turn_finished:0" {
 				return fmt.Errorf("decisions %s, want both skipped", got)
@@ -538,7 +548,7 @@ func (s *mobilePushState) receivesNothing() error {
 			break
 		}
 		select {
-		case <-s.decided:
+		case <-s.rec.decided:
 		case <-deadline:
 			return fmt.Errorf("decisions so far: %s", got)
 		}

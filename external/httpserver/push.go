@@ -468,12 +468,20 @@ func (p *pushService) sendTest(ctx context.Context, device string) (int, error) 
 	return sent, nil
 }
 
+// sendAll delivers to every subscription at once: a device must not wait for
+// another device's push service, nor for a dead subscription to answer.
 func (p *pushService) sendAll(ev pushAttention, title string, targets []pushSubscriptionRecord) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	var wg sync.WaitGroup
 	for _, rec := range targets {
-		p.sendOne(ctx, ev, title, rec)
+		wg.Add(1)
+		go func(rec pushSubscriptionRecord) {
+			defer wg.Done()
+			p.sendOne(ctx, ev, title, rec)
+		}(rec)
 	}
+	wg.Wait()
 }
 
 // sendOne delivers one notice to one subscription and keeps the store in step
