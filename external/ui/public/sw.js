@@ -14,7 +14,13 @@
  * - open the chat a notification is about when it is clicked: the tab that
  *   asked (or any tab of the app) is focused and told which session to open
  *   with a "coddy-open" message, and with no tab left a new window opens on
- *   the chat's address.
+ *   the chat's address;
+ * - show what the server pushes while no tab is open (Web Push, level two of
+ *   the notifications, external/httpserver/push.go). Every push is shown,
+ *   since a browser revokes a subscription that receives silent ones; a
+ *   permission notice carries Allow and Reject, which answer it from the
+ *   notification, and the worker tells the server when a push arrived, which
+ *   is how delivery time is measured.
  *
  * Contract: DESIGN.md, "Installable app and notifications".
  */
@@ -79,10 +85,142 @@ async function showForTab(msg, sourceId) {
   await self.registration.showNotification(msg.title, options);
 }
 
+self.addEventListener("push", (event) => {
+  event.waitUntil(showPushed(event));
+});
+
+async function showPushed(event) {
+  const receivedAt = Date.now();
+  let notice = {};
+  try {
+    notice = event.data ? event.data.json() : {};
+  } catch {
+    notice = {};
+  }
+  const title =
+    typeof notice.title === "string" && notice.title ? notice.title : "Coddy";
+  const tag = typeof notice.tag === "string" ? notice.tag : "";
+  const data = {
+    url: typeof notice.url === "string" ? notice.url : "/",
+    sessionId: typeof notice.sessionId === "string" ? notice.sessionId : "",
+    env: "local",
+    client: "",
+    kind: typeof notice.kind === "string" ? notice.kind : "",
+    sentAt: typeof notice.sentAt === "number" ? notice.sentAt : 0,
+    toolCallId: typeof notice.toolCallId === "string" ? notice.toolCallId : "",
+    allow: typeof notice.allow === "string" ? notice.allow : "",
+    reject: typeof notice.reject === "string" ? notice.reject : "",
+  };
+  const options = {
+    body: typeof notice.body === "string" ? notice.body : "",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    data,
+  };
+  if (tag) {
+    options.tag = tag;
+    options.renotify = true;
+    // A tab of this browser that already showed the same occurrence wins.
+    shownTags.set(tag, receivedAt);
+  }
+  if (typeof notice.lang === "string" && notice.lang)
+    options.lang = notice.lang;
+  if (data.kind === "permission" && data.toolCallId && data.allow) {
+    const ru = typeof notice.lang === "string" && notice.lang.startsWith("ru");
+    options.actions = [
+      { action: "allow", title: ru ? "Разрешить" : "Allow" },
+      { action: "reject", title: ru ? "Отклонить" : "Reject" },
+    ];
+    options.requireInteraction = true;
+  }
+  await self.registration.showNotification(title, options);
+  await sendReceipt({ tag, kind: data.kind, sentAt: data.sentAt, receivedAt });
+}
+
+async function sendReceipt(body) {
+  try {
+    await fetch("/coddy/push/receipt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+    });
+  } catch {
+    /* a receipt is a measurement, never a reason to fail the notice */
+  }
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(resubscribe(event));
+});
+
+async function resubscribe(event) {
+  // The push service replaced the endpoint: subscribe again with the same key
+  // and hand the new endpoint over; the server drops the old one at its 410.
+  try {
+    const old = event.oldSubscription;
+    const key = old && old.options ? old.options.applicationServerKey : null;
+    if (!key) return;
+    const sub = await self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: key,
+    });
+    const json = sub.toJSON();
+    await fetch("/coddy/push/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+      credentials: "same-origin",
+    });
+  } catch {
+    /* the next visit of the app subscribes again */
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(openFromNotification(event.notification.data || {}));
+  const data = event.notification.data || {};
+  if (
+    (event.action === "allow" || event.action === "reject") &&
+    data.toolCallId
+  ) {
+    event.waitUntil(answerFromNotification(event.action, data));
+    return;
+  }
+  event.waitUntil(openFromNotification(data));
 });
+
+async function answerFromNotification(action, data) {
+  const optionId = action === "allow" ? data.allow : data.reject;
+  let ok = false;
+  try {
+    const res = await fetch(
+      `/coddy/sessions/${encodeURIComponent(data.sessionId)}/permission`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toolCallId: data.toolCallId,
+          optionId: optionId || action,
+        }),
+        credentials: "same-origin",
+      },
+    );
+    ok = res.ok;
+  } catch {
+    ok = false;
+  }
+  await sendReceipt({
+    kind: data.kind,
+    sentAt: data.sentAt,
+    action: ok ? action : action + "-failed",
+  });
+  if (!ok) {
+    // Answered elsewhere already, or the server is out of reach: the chat
+    // shows what happened.
+    await openFromNotification(data);
+  }
+}
 
 async function openFromNotification(data) {
   const windows = await self.clients.matchAll({

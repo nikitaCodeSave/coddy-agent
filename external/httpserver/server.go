@@ -113,6 +113,10 @@ type Server struct {
 	// totpGuard keeps a one-time code from opening a second session.
 	totpGuard  webauth.TOTPReplayGuard
 	challenges challengeStore
+	// push delivers Web Push notices to subscribed browsers (push.go), and
+	// devices holds the phones paired by a QR code (devices.go).
+	push    *pushService
+	devices *deviceStore
 	// served remembers the configurations GET /coddy/config handed out, so a
 	// PUT is measured against what its client read (config_revisions.go).
 	served *configapi.Revisions
@@ -267,6 +271,8 @@ func New(cfg *config.Config, mgr *session.Manager, log *slog.Logger, defaultCWD 
 	// A board changes from a tool call of any surface's turn or from a route
 	// of this server; either way the web UI reads it again on the event.
 	s.removeCanvasObserver = canvas.OnChange(s.publishCanvasChanged)
+	s.push = newPushService(s.pushHome, s.log)
+	s.devices = newDeviceStore(s.pushHome, s.log)
 	// Several servers may share one manager (tests do), so each takes its own removable
 	// observer registration rather than a single manager-wide slot.
 	if mgr != nil {
@@ -328,6 +334,8 @@ func New(cfg *config.Config, mgr *session.Manager, log *slog.Logger, defaultCWD 
 	s.registerProvidersRoutes()
 	s.registerOnboardingRoutes()
 	s.registerWallpaperRoutes()
+	s.registerPushRoutes()
+	s.registerDeviceRoutes()
 	s.mux.HandleFunc("GET /openapi.yaml", s.handleOpenAPIYAML)
 	s.mux.HandleFunc("GET /openapi.json", s.handleOpenAPIJSON)
 	s.mux.HandleFunc("GET /docs", s.redirectDocsTrailingSlash)
@@ -1052,6 +1060,7 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 			dropImageParts(prefix)
 		}
 		prompt := []acp.ContentBlock{{Type: "text", Text: last.Content}}
+		s.push.follow(sessionID)
 		promptOpts := &session.PromptRunOpts{SkipTurnLock: true, StatisticsSource: statisticsSourceFromHTTP(req.Metadata), SurfaceSystemPrompt: surfacePromptFromHTTP(req.Metadata), Lang: langFromHTTP(req.Metadata), ImageGeneration: imageGenerationFromHTTP(req.Metadata)}
 		if promptOpts.ImageGeneration {
 			taken, err := s.mgr.PrepareImageGenerationPrompt(ctx, sessionID, prompt, promptOpts)
@@ -1780,6 +1789,7 @@ func (s *Server) handleResponsesCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		s.push.follow(sid)
 		promptOpts := &session.PromptRunOpts{SkipTurnLock: true, StatisticsSource: statisticsSourceFromHTTP(body.Metadata), SurfaceSystemPrompt: surfacePromptFromHTTP(body.Metadata), Lang: langFromHTTP(body.Metadata), ImageGeneration: imageGenerationFromHTTP(body.Metadata)}
 		if promptOpts.ImageGeneration {
 			taken, err := s.mgr.PrepareImageGenerationPrompt(ctx, sid, promptBlocks, promptOpts)

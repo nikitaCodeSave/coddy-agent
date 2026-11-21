@@ -273,6 +273,9 @@ export function stubServer(source: ServerState | (() => ServerState)) {
         },
         allTime: { models: [] },
       });
+    if (route === "/coddy/devices" && method === "GET") {
+      return reply(200, { object: "list", data: [] });
+    }
     if (route === "/coddy/status" && method === "GET") {
       const { status, body } = server.status ?? { status: 404 };
       return reply(status, body ?? {});

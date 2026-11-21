@@ -43,6 +43,10 @@ type HTTPServerConfig struct {
 	Login HTTPLoginConfig `yaml:"login"`
 	// PublicDocs keeps /docs and /openapi.* reachable without a token even when auth is enabled.
 	PublicDocs bool `yaml:"public_docs"`
+	// PublicURL is the address a phone opens this server by: what the pairing
+	// QR code of the web UI carries. Empty means the address the computer's
+	// browser used, which a phone reaches only when it is not localhost.
+	PublicURL string `yaml:"public_url,omitempty"`
 	// AllowInsecure says a server without authentication is open on purpose. It
 	// silences the two startup warnings about one - a non-loopback bind, and CORS
 	// that admits pages nobody listed (allow_loopback or "*") - and the --dry-run

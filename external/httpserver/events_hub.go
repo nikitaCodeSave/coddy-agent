@@ -91,6 +91,7 @@ func turnEventFrame(ev session.TurnEvent) []byte {
 
 // publishTurnEvent is the Manager observer this server registers in New.
 func (s *Server) publishTurnEvent(ev session.TurnEvent) {
+	s.pushTurnEdge(ev)
 	if s.events == nil {
 		return
 	}

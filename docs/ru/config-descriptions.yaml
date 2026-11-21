@@ -626,6 +626,9 @@ httpserver.login.session_ttl_hours:
 httpserver.public_docs:
   en: "When auth is enabled, keep /docs and /openapi.* reachable without a token."
   ru: "Если аутентификация включена, оставлять /docs и /openapi.* доступными без токена."
+httpserver.public_url:
+  en: "Address a phone opens this server by (https://...), carried by the pairing QR code of the web UI (Settings, Phone). Empty uses the address the computer's browser is on, which a phone reaches only when it is not localhost."
+  ru: "Адрес, по которому телефон открывает этот сервер (https://...). Его содержит QR-код подключения в веб-интерфейсе (Настройки, Телефон). Если пусто, берётся адрес, открытый в браузере компьютера; телефон дойдёт до него, только если это не localhost."
 httpserver.allow_insecure:
   en: "Say that a server without authentication is open on purpose: silences the two startup warnings about it - a non-loopback bind, and CORS that admits pages nobody listed (allow_loopback or \"*\") - and the --dry-run findings that mirror them, and turns off the refusal of a foreign Host on loopback and of a cross-origin write."
   ru: "Говорит, что сервер без аутентификации открыт сознательно. Подавляет два предупреждения при запуске о таком сервере - о привязке не к loopback и о CORS, который пускает никем не перечисленные страницы (allow_loopback или \"*\") - и соответствующие находки --dry-run, а также отключает отказ чужому Host на loopback и межсайтовой записи."

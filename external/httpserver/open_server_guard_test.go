@@ -76,8 +76,10 @@ func TestOpenServerGuard_NoCredential(t *testing.T) {
 		{"localhost name", http.MethodGet, "/v1/models", "localhost" + port, "", 0},
 		{"subdomain of localhost", http.MethodGet, "/v1/models", "app.localhost" + port, "", 0},
 		{"ipv6 loopback name", http.MethodGet, "/v1/models", "[::1]" + port, "", 0},
-		{"foreign host name", http.MethodGet, "/v1/models", "attacker.example" + port, "", http.StatusMisdirectedRequest},
-		{"foreign host on a write", http.MethodPost, "/v1/chat/completions", "attacker.example", "", http.StatusMisdirectedRequest},
+		// Another name reaches the API only on a paired device's cookie
+		// (devices.go); without one the request is refused as unauthorized.
+		{"foreign host name", http.MethodGet, "/v1/models", "attacker.example" + port, "", http.StatusUnauthorized},
+		{"foreign host on a write", http.MethodPost, "/v1/chat/completions", "attacker.example", "", http.StatusUnauthorized},
 		{"write without origin", http.MethodPost, "/v1/chat/completions", "", "", 0},
 		{"write from own origin", http.MethodPost, "/v1/chat/completions", "", ts.URL, 0},
 		{"write from another site", http.MethodPost, "/v1/chat/completions", "", "https://attacker.example", http.StatusForbidden},
@@ -90,7 +92,7 @@ func TestOpenServerGuard_NoCredential(t *testing.T) {
 			if tc.refused != 0 && got != tc.refused {
 				t.Fatalf("status %d, want %d", got, tc.refused)
 			}
-			if tc.refused == 0 && (got == http.StatusMisdirectedRequest || got == http.StatusForbidden) {
+			if tc.refused == 0 && (got == http.StatusMisdirectedRequest || got == http.StatusForbidden || got == http.StatusUnauthorized) {
 				t.Fatalf("status %d, want the request to pass the guard", got)
 			}
 		})

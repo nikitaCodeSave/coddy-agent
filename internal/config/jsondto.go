@@ -391,6 +391,7 @@ type HTTPServerJSON struct {
 	LoginConfigured bool             `json:"login_configured,omitempty"`
 	LoginSource     string           `json:"login_source,omitempty"`
 	PublicDocs      bool             `json:"public_docs,omitempty"`
+	PublicURL       string           `json:"public_url,omitempty"`
 	AllowInsecure   bool             `json:"allow_insecure,omitempty"`
 	CORS            HTTPCORSJSON     `json:"cors,omitempty"`
 	Remotes         []HTTPRemoteJSON `json:"remotes,omitempty"`
@@ -716,6 +717,7 @@ func ConfigToJSONDTO(c *Config) *ConfigJSON {
 		Host:                     c.HTTPServer.Host,
 		Port:                     c.HTTPServer.Port,
 		PublicDocs:               c.HTTPServer.PublicDocs,
+		PublicURL:                c.HTTPServer.PublicURL,
 		AllowInsecure:            c.HTTPServer.AllowInsecure,
 		// AuthToken is intentionally redacted; report only whether one is configured.
 		AuthConfigured: strings.TrimSpace(c.HTTPServer.AuthToken) != "",
@@ -1005,6 +1007,7 @@ func JSONDTOToConfig(j *ConfigJSON, paths Paths) *Config {
 			SessionTTLHoursSet: j.HTTPServer.Login.SessionTTLHoursSet,
 		},
 		PublicDocs:    j.HTTPServer.PublicDocs,
+		PublicURL:     j.HTTPServer.PublicURL,
 		AllowInsecure: j.HTTPServer.AllowInsecure,
 		CORS: HTTPCORSConfig{
 			Enabled:        j.HTTPServer.CORS.Enabled,

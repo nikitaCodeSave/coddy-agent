@@ -328,6 +328,53 @@ export const messagesRu: Record<string, string> = {
   "notify.questionWithText": "Агент спрашивает: {question}",
   "notify.subagentPermission": "{agent} просит разрешение: {tool}",
   "notify.subagentUnnamed": "Субагент",
+  "phone.pair.title": "Подключить телефон",
+  "phone.pair.intro":
+    "Наведите камеру телефона на QR-код. Телефон откроет Coddy и войдёт без пароля.",
+  "phone.pair.address": "Адрес для телефона",
+  "phone.pair.addressHint":
+    "HTTPS-адрес, который видит телефон, например TLS-прокси в вашей сети. Если поле пустое, берётся httpserver.public_url или адрес этой страницы.",
+  "phone.pair.show": "Показать QR-код",
+  "phone.pair.again": "Новый код",
+  "phone.pair.failed": "Не удалось создать код подключения.",
+  "phone.pair.qrAlt": "QR-код для подключения телефона",
+  "phone.pair.scan": "Отсканируйте камерой телефона",
+  "phone.pair.codeLabel": "Или введите на телефоне этот код",
+  "phone.pair.expires":
+    "Действует до {time} в браузере телефона и в приложении на его домашнем экране.",
+  "phone.pair.localWarning":
+    "Это адрес localhost, телефон его не откроет. Укажите адрес, который видит телефон.",
+  "phone.pair.insecureWarning":
+    "Адрес без https: телефон откроет Coddy, но не сможет установить приложение и получать уведомления.",
+  "phone.push.title": "Уведомления на этом устройстве",
+  "phone.push.toggle": "Даже когда Coddy закрыт",
+  "phone.push.hint":
+    "Когда агент закончит ход, попросит разрешение или задаст вопрос, уведомление придёт, даже если все вкладки закрыты. На Android на запрос разрешения можно ответить прямо из уведомления.",
+  "phone.push.unsupported": "Этот браузер не получает push-уведомления.",
+  "phone.push.insecure": "Для уведомлений нужен адрес https.",
+  "phone.push.install":
+    'На iPhone и iPad уведомления приходят только приложению на домашнем экране: нажмите "Поделиться", затем "На экран Домой" и откройте Coddy с иконки.',
+  "phone.push.denied":
+    "Уведомления для этого сайта запрещены в настройках браузера.",
+  "phone.push.remote":
+    "Push-уведомления работают только для сервера, с которого открыта эта страница.",
+  "phone.push.failed": "Не удалось включить уведомления: {reason}",
+  "phone.push.test": "Отправить тестовое уведомление",
+  "phone.push.testSent": "Отправлено, придёт через несколько секунд.",
+  "phone.push.testNone": "Ничего не отправлено: это устройство не подписано.",
+  "phone.devices.title": "Подключённые устройства",
+  "phone.devices.none": "Пока не подключено ни одного устройства.",
+  "phone.devices.this": "это устройство",
+  "phone.devices.seen": "Последний раз: {time}",
+  "phone.devices.remove": "Отключить",
+  "auth.pair.title": "Подключите это устройство",
+  "auth.pair.copy":
+    "Откройте в Coddy на компьютере Настройки, раздел Телефон, и отсканируйте QR-код или введите показанный там код.",
+  "auth.pair.code": "Код подключения",
+  "auth.pair.submit": "Подключить",
+  "auth.pair.refused":
+    "Код неверный или устарел. Покажите на компьютере новый.",
+  "auth.pair.failed": "Не удалось подключиться ({status}).",
 
   "auth.signIn.logoAlt": "Coddy агент",
   "auth.signIn.title": "Вход",
@@ -421,6 +468,7 @@ export const messagesRu: Record<string, string> = {
   "settings.error.noItemSchema": "У этого раздела нет схемы элементов.",
 
   "settings.section.appearance.label": "Оформление",
+  "settings.section.phone.label": "Телефон",
   "settings.section.sessions_manager.label": "Сессии",
   "settings.section.providers.label": "Провайдеры LLM",
   "settings.section.models.label": "Логические модели",
@@ -437,6 +485,7 @@ export const messagesRu: Record<string, string> = {
   "settings.section.subagents.label": "Субагенты",
   "settings.section.hooks.label": "Хуки",
   "settings.section.appearance.desc": "Тема и цветовой режим",
+  "settings.section.phone.desc": "Подключение и уведомления",
   "settings.section.sessions_manager.desc": "Сохранённые чаты и очистка",
   "settings.section.providers.desc": "Подключения LLM API",
   "settings.section.models.desc": "Именованные конфигурации моделей",

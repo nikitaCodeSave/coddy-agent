@@ -20,6 +20,7 @@ import { startActiveHealthMonitor } from "./ui/env/activeHealth";
 import { initTelegramMiniApp } from "./ui/telegram/miniApp";
 import { telegramLaunch } from "./ui/telegram/launch";
 import { registerServiceWorker } from "./ui/pwa/serviceWorker";
+import { installPresence } from "./ui/pwa/push";
 import { followThemeColor } from "./ui/pwa/themeColor";
 import {
   applyServerThemeDefaults,
@@ -84,3 +85,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 // nothing, so it is registered once the page is up and never stands between
 // the page and the server.
 registerServiceWorker();
+// Whether this tab has the person's attention, so the server pushes to other
+// devices only what nobody sees here (ui/pwa/push.ts).
+installPresence();

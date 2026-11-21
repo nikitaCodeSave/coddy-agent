@@ -174,7 +174,7 @@ func (s *Server) registerAuthRoutes() {
 // invalid. None of them returns anything about the machine behind the gate.
 func isAuthRoutePattern(pattern string) bool {
 	switch pattern {
-	case "POST /coddy/auth/login", "POST /coddy/auth/login/verify", "POST /coddy/auth/logout", "GET /coddy/auth/me", "POST /coddy/auth/telegram", "POST /coddy/auth/browser":
+	case "POST /coddy/auth/login", "POST /coddy/auth/login/verify", "POST /coddy/auth/logout", "GET /coddy/auth/me", "POST /coddy/auth/telegram", "POST /coddy/auth/browser", "POST /coddy/auth/pair":
 		return true
 	}
 	return false
@@ -276,10 +276,23 @@ func (s *Server) coddyAuthMeGet(w http.ResponseWriter, r *http.Request) {
 	// Browser that its ticket can sign it in.
 	_, browserOK := s.browserPanelKey()
 	out["browser_login"] = browserOK && auth.enabled
+	// pair_login tells the page that a pairing code from the computer signs
+	// this browser in. pair_required says that this request reached an open
+	// server under another name than localhost, where only a paired device is
+	// let in (openServerGuard).
+	out["pair_login"] = !s.noAuth
+	if !auth.enabled && arrivedOnLoopback(r) && !isLocalHostName(hostName(r.Host)) && !s.openOnPurpose() {
+		out["auth_required"] = true
+		out["pair_required"] = true
+	}
 	if sess, ok := s.sessionFromRequest(r, pol); ok {
 		out["authenticated"] = true
 		out["user"] = sess.User
 		out["expires_at"] = sess.ExpiresAt.UTC().Format(time.RFC3339)
+	} else if dev, ok := s.deviceFromRequest(r); ok {
+		out["authenticated"] = true
+		out["user"] = "device:" + dev.Name
+		out["device"] = dev.ID
 	} else if sess, ok := s.telegramSessionFromRequest(r); ok {
 		out["authenticated"] = true
 		out["user"] = sess.User

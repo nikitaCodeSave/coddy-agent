@@ -5,8 +5,10 @@ Feature: A coddy serve without a credential answers only its own machine's clien
   of another site open in the same browser is neither: it either names the
   server by a host name of its own or sends a request that carries its own
   origin. While no credential is configured and the request arrived on loopback,
-  the server answers the first with 421 and refuses a state-changing request of
-  the second with 403. A credential leaves the decision to the auth gate.
+  the server lets the first reach its API only on the cookie of a device paired
+  by a QR code (401 without one; a proxy in front of the server gives a phone
+  such a name) and refuses a state-changing request of the second with 403. A
+  credential leaves the decision to the auth gate.
 
   Scenario: Local clients and the server's own page keep working
     Given a coddy HTTP server on loopback without a credential
@@ -22,10 +24,10 @@ Feature: A coddy serve without a credential answers only its own machine's clien
     When a page at "https://example.com" posts to "/v1/chat/completions"
     Then the request is refused with 403
 
-  Scenario: The server does not answer a host name that is not loopback
+  Scenario: The API answers a host name that is not loopback only to a paired device
     Given a coddy HTTP server on loopback without a credential
     When a client asks "example.com" for "/v1/models"
-    Then the request is refused with 421
+    Then the request is refused with 401
 
   Scenario: A configured token leaves the decision to the auth gate
     Given a coddy HTTP server on loopback with token "secret"

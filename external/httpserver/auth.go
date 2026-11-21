@@ -145,13 +145,16 @@ func isOpaqueOrigin(r *http.Request) bool {
 }
 
 // hasCookieSession reports whether the request carries a live browser
-// session: the sign-in form's, a Telegram admin's Mini App session, or the
-// side panel of Coddy for Browser.
+// session: the sign-in form's, a Telegram admin's Mini App session, a device
+// paired by a QR code, or the side panel of Coddy for Browser.
 func (s *Server) hasCookieSession(r *http.Request, login loginPolicy) bool {
 	if _, ok := s.sessionFromRequest(r, login); ok {
 		return true
 	}
 	if _, ok := s.telegramSessionFromRequest(r); ok {
+		return true
+	}
+	if _, ok := s.deviceFromRequest(r); ok {
 		return true
 	}
 	_, ok := s.browserSessionFromRequest(r)

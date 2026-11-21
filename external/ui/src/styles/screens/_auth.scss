@@ -230,3 +230,8 @@
     transition: none;
   }
 }
+
+// The pairing code next to the password form (src/ui/auth/PairCodeCard.tsx).
+.auth-pair--compact {
+  margin-top: 16px;
+}

@@ -12,7 +12,8 @@ export type SectionKind =
   | "appearance"
   | "sessions"
   | "status"
-  | "authentication";
+  | "authentication"
+  | "phone";
 
 /** The MCP servers tab: its id stays the old key's, the address #/settings/mcp_servers. */
 export const MCP_SECTION_ID = "mcp_servers";
@@ -41,6 +42,7 @@ const SECTION_LABEL_KEYS = {
   httpserver: "settings.section.httpserver.label",
   statistics: "stats.title",
   appearance: "settings.section.appearance.label",
+  phone: "settings.section.phone.label",
   sessions_manager: "settings.section.sessions_manager.label",
   status: "settings.section.status.label",
   providers: "settings.section.providers.label",
@@ -75,6 +77,7 @@ const SECTION_LABEL_KEYS = {
 const SECTION_DESC_KEYS = {
   httpserver: "settings.section.httpserver.desc",
   appearance: "settings.section.appearance.desc",
+  phone: "settings.section.phone.desc",
   sessions_manager: "settings.section.sessions_manager.desc",
   status: "settings.section.status.desc",
   providers: "settings.section.providers.desc",
@@ -196,9 +199,17 @@ export function deriveSettingsSections(
     description: translate("stats.settings.description"),
     kind: "statistics",
   };
+  // Pairing a phone and the notices of this device: on an agent only, as a
+  // relay has no sessions to notify about.
+  const phone: SectionDescriptor = {
+    id: "phone",
+    label: labelFor("phone"),
+    description: translate(SECTION_DESC_KEYS.phone),
+    kind: "phone",
+  };
   const head = relay
     ? [appearance]
-    : [appearance, sessionsManager, status, statistics];
+    : [appearance, phone, sessionsManager, status, statistics];
   if (!schema || schema.type !== "object" || !schema.properties) {
     return head;
   }
@@ -360,6 +371,9 @@ export const SETTINGS_TEXTS = {
   },
   appearanceLanguage: { label: "appearance.languageLabel" },
   appearanceNotifications: { label: "appearance.notificationsLabel" },
+  phonePair: { label: "phone.pair.title" },
+  phonePush: { label: "phone.push.title" },
+  phoneDevices: { label: "phone.devices.title" },
   appearanceWallpaper: {
     label: "appearance.wallpaperLabel",
     desc: "appearance.wallpaper.hint",

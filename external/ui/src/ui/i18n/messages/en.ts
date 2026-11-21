@@ -322,6 +322,53 @@ export const messagesEn: Record<string, string> = {
   "notify.questionWithText": "The agent asks: {question}",
   "notify.subagentPermission": "{agent} needs permission: {tool}",
   "notify.subagentUnnamed": "A subagent",
+  "phone.pair.title": "Connect a phone",
+  "phone.pair.intro":
+    "Scan the QR code with the phone's camera. The phone opens Coddy and signs in without a password.",
+  "phone.pair.address": "Address the phone opens",
+  "phone.pair.addressHint":
+    "An https address the phone reaches, such as a TLS proxy on your network. Empty uses httpserver.public_url or the address of this page.",
+  "phone.pair.show": "Show QR code",
+  "phone.pair.again": "New code",
+  "phone.pair.failed": "Could not create a pairing code.",
+  "phone.pair.qrAlt": "QR code that pairs a phone",
+  "phone.pair.scan": "Scan with the phone's camera",
+  "phone.pair.codeLabel": "Or type this code on the phone",
+  "phone.pair.expires":
+    "Valid until {time}, in the phone's browser and in the app on its home screen.",
+  "phone.pair.localWarning":
+    "This address is localhost, which a phone cannot open. Enter the address the phone reaches.",
+  "phone.pair.insecureWarning":
+    "The address is not https: the phone opens Coddy but cannot install it or receive notifications.",
+  "phone.push.title": "Notifications on this device",
+  "phone.push.toggle": "Also when Coddy is closed",
+  "phone.push.hint":
+    "When the agent finishes, asks for a permission or asks a question, the notice arrives with every tab closed. On Android a permission is answered from the notification.",
+  "phone.push.unsupported": "This browser cannot receive push notifications.",
+  "phone.push.insecure": "Notifications need an https address.",
+  "phone.push.install":
+    "On iPhone and iPad notifications reach only Coddy added to the home screen: tap Share, then Add to Home Screen, and open Coddy from its icon.",
+  "phone.push.denied":
+    "Notifications for this site are blocked in the browser's settings.",
+  "phone.push.remote":
+    "Push notifications work only for the server this page was opened from.",
+  "phone.push.failed": "Could not turn notifications on: {reason}",
+  "phone.push.test": "Send a test notification",
+  "phone.push.testSent": "Sent. It arrives in a few seconds.",
+  "phone.push.testNone": "Nothing was sent: this device is not subscribed.",
+  "phone.devices.title": "Paired devices",
+  "phone.devices.none": "No device is paired yet.",
+  "phone.devices.this": "this device",
+  "phone.devices.seen": "Last seen {time}",
+  "phone.devices.remove": "Remove",
+  "auth.pair.title": "Pair this device",
+  "auth.pair.copy":
+    "In Coddy on your computer open Settings, Phone, and scan the QR code or type the code shown there.",
+  "auth.pair.code": "Pairing code",
+  "auth.pair.submit": "Pair",
+  "auth.pair.refused":
+    "The code is wrong or has expired. Show a new one on the computer.",
+  "auth.pair.failed": "Pairing failed ({status}).",
 
   // The wordmark says "Coddy agent" in the image; this is what a screen
   // reader says in its place.
@@ -415,6 +462,7 @@ export const messagesEn: Record<string, string> = {
   "settings.error.noItemSchema": "This section has no item schema.",
 
   "settings.section.appearance.label": "Appearance",
+  "settings.section.phone.label": "Phone",
   "settings.section.sessions_manager.label": "Sessions",
   "settings.section.providers.label": "LLM providers",
   "settings.section.models.label": "Logical models",
@@ -431,6 +479,7 @@ export const messagesEn: Record<string, string> = {
   "settings.section.subagents.label": "Subagents",
   "settings.section.hooks.label": "Hooks",
   "settings.section.appearance.desc": "Theme & color mode",
+  "settings.section.phone.desc": "Pair a phone, notifications",
   "settings.section.sessions_manager.desc": "Stored chats & cleanup",
   "settings.section.providers.desc": "LLM API connections",
   "settings.section.models.desc": "Named model configs",

@@ -46,6 +46,10 @@ type Sender struct {
 	model           string
 	sessionDir      string
 	questionPending func(sessionID string, pending bool)
+	// onPermission and onQuestion hear every prompt this sender hands to its
+	// client, so a notice can reach a person who is not looking (push.go).
+	onPermission func(params acp.PermissionRequestParams, tool string)
+	onQuestion   func(sessionID, requestID, text string)
 	// lastWrite stamps the most recent frame so the idle keepalive knows whether the
 	// stream has gone quiet. Guarded by mu, like every other write to w.
 	lastWrite time.Time
@@ -197,6 +201,16 @@ func (s *Sender) SetQuestionPendingCallback(callback func(sessionID string, pend
 	s.questionPending = callback
 }
 
+// SetAttentionCallbacks installs the optional observers of the prompts this
+// sender asks: a permission (with the tool it names) and a question (with the
+// text of its first prompt). Both are called after the prompt was handed on.
+func (s *Sender) SetAttentionCallbacks(onPermission func(params acp.PermissionRequestParams, tool string), onQuestion func(sessionID, requestID, text string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onPermission = onPermission
+	s.onQuestion = onQuestion
+}
+
 func (s *Sender) notifyQuestionPending(sessionID string, pending bool) {
 	s.mu.Lock()
 	callback := s.questionPending
@@ -215,6 +229,7 @@ func wireBridgeSession(bridge *Sender, st *session.State) {
 func (s *Server) configureSender(bridge *Sender) *Sender {
 	if bridge != nil {
 		bridge.SetQuestionPendingCallback(s.publishQuestionPending)
+		bridge.SetAttentionCallbacks(s.pushPermission, s.pushQuestion)
 	}
 	return bridge
 }
@@ -444,6 +459,12 @@ func (s *Sender) RequestPermission(ctx context.Context, params acp.PermissionReq
 		// /coddy/sessions/{id}/permission on a connection of its own, and a
 		// watcher can pick the prompt up there.
 	}
+	s.mu.Lock()
+	onPermission := s.onPermission
+	s.mu.Unlock()
+	if onPermission != nil && !relayed {
+		onPermission(params, toolName)
+	}
 	// A wait that ends without an answer still ends the prompt: the turn
 	// records the call as refused (a Stop, a cancelled turn), so a record left
 	// behind would only keep the session "permission pending" in History.
@@ -500,6 +521,16 @@ func (s *Sender) RequestQuestion(ctx context.Context, params acp.QuestionRequest
 		// A dead client socket must not fail the question: the frame still
 		// reached the composer relay through the tee, and the answer arrives
 		// through POST /coddy/sessions/{id}/question, not through this stream.
+	}
+	s.mu.Lock()
+	onQuestion := s.onQuestion
+	s.mu.Unlock()
+	if onQuestion != nil {
+		text := ""
+		if len(params.Questions) > 0 {
+			text = params.Questions[0].Question
+		}
+		onQuestion(sid, rid, text)
 	}
 	select {
 	case reply := <-ch:

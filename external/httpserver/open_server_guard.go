@@ -40,6 +40,34 @@ func (s *Server) openServerGuard(next http.Handler) http.Handler {
 			return
 		}
 		if arrivedOnLoopback(r) && !isLocalHostName(hostName(r.Host)) {
+			// Another name reaches an open local server through a proxy in front
+			// of it (a TLS proxy on the LAN, a tailnet name, a tunnel). A phone
+			// paired by a QR code is let in on its cookie; before that, only the
+			// page and the sign-in routes answer, so the phone can pair.
+			if _, ok := s.deviceFromRequest(r); ok {
+				if isStateChanging(r) && !isSameOriginRequest(r) {
+					http.Error(w, "cross-site request refused", http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			_, pattern := s.mux.Handler(r)
+			if pattern == "/" || isAuthRoutePattern(pattern) {
+				if isStateChanging(r) && !isSameOriginRequest(r) {
+					http.Error(w, "cross-site request refused", http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+				return
+			}
+			if pattern != "" {
+				w.Header().Set("WWW-Authenticate", `Bearer realm="coddy"`)
+				http.Error(w, "this server answers another name than localhost only to a paired device; "+
+					"pair this browser with the code the web UI shows on the computer (Settings, Phone), "+
+					"or set httpserver.auth_token or the web sign-in", http.StatusUnauthorized)
+				return
+			}
 			http.Error(w, "this server answers only loopback host names while it runs without a credential; "+
 				"set httpserver.auth_token or the web sign-in to reach it by another name, "+
 				"or httpserver.allow_insecure if it is open on purpose", http.StatusMisdirectedRequest)

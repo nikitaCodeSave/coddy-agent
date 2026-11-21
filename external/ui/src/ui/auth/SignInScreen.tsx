@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n/I18nProvider";
+import { PairCodeCard } from "./PairCodeCard";
 import { LIGHT_THEMES } from "../theme/themeCookie";
 import { readAppliedUiTheme } from "../theme/uiTheme";
 import { motionIsReduced, subscribeUiSimple } from "../theme/uiSimple";
@@ -147,7 +148,9 @@ export function SignInScreen(props: { onSignedIn?: () => void }) {
           width={188}
           height={56}
         />
-        {(telegramNote || telegramNotKept) && !auth.loginRequired ? (
+        {auth.pairRequired && !auth.loginRequired ? (
+          <PairCodeCard />
+        ) : (telegramNote || telegramNotKept) && !auth.loginRequired ? (
           <div className="auth-card">
             <p className="auth-error" role="alert" data-testid="telegram-note">
               {telegramNote || t("auth.signIn.notKept")}{" "}
@@ -350,6 +353,9 @@ export function SignInScreen(props: { onSignedIn?: () => void }) {
             ) : null}
           </form>
         )}
+        {auth.loginRequired && auth.pairAvailable && !verifying ? (
+          <PairCodeCard compact />
+        ) : null}
       </div>
     </div>
   );

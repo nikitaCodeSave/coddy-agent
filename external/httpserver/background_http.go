@@ -80,6 +80,7 @@ func (s *Server) RunBackgroundWake(ctx context.Context, wake agent.Wake) (bool, 
 	rel := s.beginComposerRelay(sessionID)
 	defer s.endComposerRelay(sessionID, rel)
 	bridge := NewWakeRelaySender(s.activeCfg(), rel, st.GetMode())
+	bridge.SetAttentionCallbacks(s.pushPermission, s.pushQuestion)
 	bridge.SetSessionDir(strings.TrimSpace(st.GetPersistedSessionDir()))
 	defer func() { _ = bridge.FinishStream() }()
 	opts := wake.RunOpts()

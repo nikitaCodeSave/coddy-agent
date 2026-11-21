@@ -712,3 +712,51 @@
   height: 16px;
   flex: none;
 }
+
+// Settings → Phone (src/ui/pwa/PhoneSection.tsx): the pairing code a person
+// types off the screen, the link the QR code carries and the paired devices.
+.phone-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.phone-pair-code {
+  margin: 4px 0;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.phone-pair-link {
+  overflow-wrap: anywhere;
+}
+
+.phone-push {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.phone-devices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phone-device {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.phone-device-name {
+  flex: 1 1 auto;
+  font-weight: 600;
+}

@@ -39,6 +39,16 @@ export type AuthState = {
    */
   telegramProblem: "" | "not_kept" | "retry";
   /**
+   * The page reached an open server under another name than localhost (a
+   * proxy in front of it), where only a device paired by the code the
+   * computer shows is let in (Settings, Phone).
+   */
+  pairRequired?: boolean;
+  /** A pairing code from the computer can sign this browser in. */
+  pairAvailable?: boolean;
+  /** The pairing code of the link this page was opened with was refused. */
+  pairRefused?: boolean;
+  /**
    * Whether the server has been asked yet. The app waits for it rather than
    * rendering and then yanking itself away to a sign-in screen.
    */
@@ -83,6 +93,8 @@ export function resetAuthStateForTests(): void {
   telegramRefused = false;
   telegramProblem = "";
   browserPanelTried = false;
+  pairTried = false;
+  pairRefused = false;
   setAuthState(initial);
 }
 
@@ -95,7 +107,77 @@ type AuthMeResponse = {
   remember_available?: boolean;
   telegram_login?: boolean;
   browser_login?: boolean;
+  pair_login?: boolean;
+  pair_required?: boolean;
 };
+
+// pairTried keeps the pairing link to one attempt per page.
+let pairTried = false;
+let pairRefused = false;
+
+/** PAIR_HASH is the address a pairing QR code opens: #/pair/<code>. */
+const PAIR_HASH = /^#\/pair\/([A-Za-z0-9-]{4,16})$/;
+
+/**
+ * takePairingCode reads the code a pairing link carries and takes it out of
+ * the address at once, so it stays out of the history and out of a bookmark.
+ */
+function takePairingCode(): string {
+  if (typeof window === "undefined") return "";
+  const m = PAIR_HASH.exec(window.location.hash);
+  if (!m) return "";
+  try {
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + window.location.search + "#/settings/phone",
+    );
+  } catch {
+    window.location.hash = "#/settings/phone";
+  }
+  return m[1] ?? "";
+}
+
+/** deviceName is how the computer lists this browser once it is paired. */
+function deviceName(): string {
+  if (typeof navigator === "undefined") return "Phone";
+  const ua = navigator.userAgent || "";
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (
+    /iPad/.test(ua) ||
+    (ua.includes("Macintosh") && navigator.maxTouchPoints > 1)
+  )
+    return "iPad";
+  const android = /Android[^;)]*;\s*([^;)]+?)\s*(Build|\))/.exec(ua);
+  if (android?.[1]) return android[1].trim().slice(0, 40);
+  if (/Android/.test(ua)) return "Android";
+  return "Browser";
+}
+
+/**
+ * pairWithCode redeems a pairing code the person typed or the QR code's link
+ * carried. The device cookie, when there is one, is set by the server.
+ */
+export async function pairWithCode(
+  code: string,
+): Promise<{ ok: boolean; status: number }> {
+  try {
+    const res = await localFetch("/coddy/auth/pair", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ code: code.trim(), name: deviceName() }),
+    });
+    if (res.ok) {
+      await refreshAuthState();
+    }
+    return { ok: res.ok, status: res.status };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}
 
 // telegramTried keeps the Mini App sign-in to one attempt per page: Telegram
 // signs a launch once, and the server takes each launch once.
@@ -178,6 +260,26 @@ export function refreshAuthState(): Promise<AuthState> {
 
 async function readAuthState(): Promise<AuthState> {
   let next = await askAuthMe();
+  // Opened from the pairing QR code: the code signs this browser in before
+  // any form is shown.
+  if (!pairTried) {
+    const code = takePairingCode();
+    if (code) {
+      pairTried = true;
+      if (!next.state.authenticated) {
+        const res = await localFetch("/coddy/auth/pair", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ code, name: deviceName() }),
+        }).catch(() => null);
+        pairRefused = !res || !res.ok;
+        next = await askAuthMe();
+      }
+    }
+  }
   // Opened as the Telegram bot's Mini App: the launch data signs an admin in
   // before any form is shown.
   if (next.wantsTelegram && !next.state.authenticated && !telegramTried) {
@@ -209,6 +311,7 @@ async function readAuthState(): Promise<AuthState> {
   }
   const state = {
     ...next.state,
+    pairRefused: pairRefused && !next.state.authenticated,
     telegramRefused: telegramRefused && !next.state.authenticated,
     telegramProblem: next.state.authenticated ? "" : telegramProblem,
   };
@@ -235,6 +338,8 @@ async function askAuthMe(): Promise<{
           user: typeof body.user === "string" ? body.user : "",
           secondFactor: body.second_factor === "totp" ? "totp" : "",
           rememberAvailable: body.remember_available !== false,
+          pairRequired: body.pair_required === true,
+          pairAvailable: body.pair_login === true,
           telegramRefused: false,
           telegramProblem: "",
           loaded: true,

@@ -2,6 +2,7 @@ import {
   AuthenticationSection,
   AUTHENTICATION_FIELD_TEXTS,
 } from "./AuthenticationSection";
+import { PhoneSection } from "../pwa/PhoneSection";
 import { Component, lazy, Suspense, useRef, type ReactNode } from "react";
 import { AppearanceThemePicker } from "../theme/AppearanceModal";
 import {
@@ -840,6 +841,10 @@ export function SettingsSection(props: {
         </Suspense>
       </ChunkBoundary>
     );
+  }
+
+  if (section.kind === "phone") {
+    return <PhoneSection />;
   }
 
   if (section.kind === "authentication") {
