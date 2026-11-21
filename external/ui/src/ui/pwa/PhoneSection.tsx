@@ -6,6 +6,7 @@ import { SETTINGS_TEXTS, landmarkAnchor } from "../settings/settingsSections";
 import {
   disablePush,
   enablePush,
+  reportPushDiagnostics,
   pushStateSnapshot,
   sendTestPush,
   subscribePushState,
@@ -174,6 +175,13 @@ export function PhoneSection() {
   useEffect(() => {
     void loadDevices();
   }, [loadDevices]);
+
+  // On a phone (any address but localhost) the stand's log learns what the
+  // browser offers for pushes, so a switch that will not turn on is explained
+  // without reading the phone's screen.
+  useEffect(() => {
+    if (!isLoopbackPage()) void reportPushDiagnostics("phone-section");
+  }, []);
 
   const showCode = useCallback(async () => {
     setBusy(true);

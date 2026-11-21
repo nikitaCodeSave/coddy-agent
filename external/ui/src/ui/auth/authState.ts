@@ -139,7 +139,7 @@ function takePairingCode(): string {
 }
 
 /** deviceName is how the computer lists this browser once it is paired. */
-function deviceName(): string {
+async function deviceName(): Promise<string> {
   if (typeof navigator === "undefined") return "Phone";
   const ua = navigator.userAgent || "";
   if (/iPhone/.test(ua)) return "iPhone";
@@ -148,9 +148,28 @@ function deviceName(): string {
     (ua.includes("Macintosh") && navigator.maxTouchPoints > 1)
   )
     return "iPad";
-  const android = /Android[^;)]*;\s*([^;)]+?)\s*(Build|\))/.exec(ua);
-  if (android?.[1]) return android[1].trim().slice(0, 40);
-  if (/Android/.test(ua)) return "Android";
+  if (/Android/.test(ua)) {
+    // Chrome on Android reduces its user agent to "Android 10; K": the model
+    // is asked of the user agent client hints instead.
+    const hints = (
+      navigator as Navigator & {
+        userAgentData?: {
+          getHighEntropyValues?: (h: string[]) => Promise<{ model?: string }>;
+        };
+      }
+    ).userAgentData;
+    try {
+      const model = (await hints?.getHighEntropyValues?.(["model"]))?.model;
+      if (model && model.trim() && model.trim() !== "K") {
+        return model.trim().slice(0, 40);
+      }
+    } catch {
+      /* no hints: the generic name below */
+    }
+    const android = /Android[^;)]*;\s*([^;)]+?)\s*(Build|\))/.exec(ua);
+    const legacy = android?.[1]?.trim() ?? "";
+    return legacy && legacy !== "K" ? legacy.slice(0, 40) : "Android";
+  }
   return "Browser";
 }
 
@@ -168,7 +187,7 @@ export async function pairWithCode(
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ code: code.trim(), name: deviceName() }),
+      body: JSON.stringify({ code: code.trim(), name: await deviceName() }),
     });
     if (res.ok) {
       await refreshAuthState();
@@ -273,7 +292,7 @@ async function readAuthState(): Promise<AuthState> {
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify({ code, name: deviceName() }),
+          body: JSON.stringify({ code, name: await deviceName() }),
         }).catch(() => null);
         pairRefused = !res || !res.ok;
         next = await askAuthMe();

@@ -169,8 +169,14 @@ export async function enablePush(): Promise<PushResult> {
       }
     }
     const key = await serverKey();
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
+    const reg = await activeRegistration();
+    // A push subscription waits for the push service; it never answers on a
+    // phone that cannot reach it, so it is bounded too.
+    let sub = await withTimeout(
+      reg.pushManager.getSubscription(),
+      15000,
+      "the push service did not answer",
+    );
     if (sub) {
       // A subscription made for another key (a server whose key changed)
       // would never deliver: subscribe again.
@@ -180,10 +186,14 @@ export async function enablePush(): Promise<PushResult> {
         sub = null;
       }
     }
-    sub ??= await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: base64UrlToBytes(key),
-    });
+    sub ??= await withTimeout(
+      reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlToBytes(key),
+      }),
+      30000,
+      "the push service did not answer",
+    );
     const json = sub.toJSON() as {
       endpoint?: string;
       keys?: { p256dh?: string; auth?: string };
@@ -211,10 +221,109 @@ export async function enablePush(): Promise<PushResult> {
     return { ok: true };
   } catch (err) {
     emit();
+    void reportPushDiagnostics(
+      "enable-failed",
+      err instanceof Error ? err.message : String(err),
+    );
     return {
       ok: false,
       reason: err instanceof Error ? err.message : String(err),
     };
+  }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(what)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      },
+    );
+  });
+}
+
+/**
+ * activeRegistration answers the service worker's registration once the
+ * worker runs. The page registers it at start and ignores a failure; here a
+ * failure is the answer, so the registration is made again with its error
+ * kept, and the wait for the worker is bounded.
+ */
+async function activeRegistration(): Promise<ServiceWorkerRegistration> {
+  const container = navigator.serviceWorker;
+  const existing = await container.getRegistration("/");
+  if (!existing) {
+    try {
+      await container.register("/sw.js", { scope: "/" });
+    } catch (err) {
+      throw new Error(
+        "the service worker could not be registered: " +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+  }
+  return withTimeout(
+    container.ready,
+    10000,
+    "the service worker did not start",
+  );
+}
+
+/**
+ * pushDiagnostics describes what this browser offers for pushes, the facts a
+ * failure on a phone is read from.
+ */
+export async function pushDiagnostics(): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {
+    support: pushSupport(),
+    secure: typeof window !== "undefined" && window.isSecureContext,
+    standalone: isStandalone(),
+    permission:
+      typeof Notification === "undefined" ? "none" : Notification.permission,
+    pushManager: typeof window !== "undefined" && "PushManager" in window,
+  };
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration("/");
+    out.worker = reg
+      ? reg.active
+        ? reg.active.state
+        : reg.installing
+          ? "installing"
+          : reg.waiting
+            ? "waiting"
+            : "none"
+      : "unregistered";
+  } catch (err) {
+    out.worker = "error: " + (err instanceof Error ? err.message : String(err));
+  }
+  return out;
+}
+
+/** reportPushDiagnostics hands the facts of this browser to the server's log. */
+export async function reportPushDiagnostics(
+  kind: string,
+  reason = "",
+): Promise<void> {
+  try {
+    const diag = await pushDiagnostics();
+    await localFetch("/coddy/push/receipt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind,
+        device: deviceId(),
+        reason,
+        diag: JSON.stringify(diag),
+      }),
+      keepalive: true,
+    });
+  } catch {
+    /* a diagnostic never fails the page */
   }
 }
 

@@ -154,6 +154,10 @@ func (s *Server) pushReceiptPost(w http.ResponseWriter, r *http.Request) {
 		SentAt     int64  `json:"sentAt"`
 		ReceivedAt int64  `json:"receivedAt"`
 		Action     string `json:"action"`
+		// Reason and Diag come from a browser that could not turn pushes on
+		// (MVP diagnostics: what it offers, why it failed).
+		Reason string `json:"reason"`
+		Diag   string `json:"diag"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxPushBodyBytes)).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "invalid JSON"})
@@ -165,6 +169,12 @@ func (s *Server) pushReceiptPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if a := limitText(body.Action, 16); a != "" {
 		attrs = append(attrs, "action", a, "action_after_send_ms", time.Now().UnixMilli()-body.SentAt)
+	}
+	if r := limitText(body.Reason, 240); r != "" {
+		attrs = append(attrs, "reason", r)
+	}
+	if d := limitText(body.Diag, 400); d != "" {
+		attrs = append(attrs, "diag", d)
 	}
 	s.log.Info("push received", attrs...)
 	w.WriteHeader(http.StatusNoContent)
