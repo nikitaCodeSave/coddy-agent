@@ -266,8 +266,11 @@ export function installPresence(): () => void {
     return () => {};
   }
   let last: boolean | null = null;
-  const report = (force: boolean) => {
-    const attentive = pageHasAttention();
+  const report = (force: boolean, leaving = false) => {
+    // A page that is going away has nobody's attention, whatever the
+    // visibility still says at that moment; otherwise a closed tab would keep
+    // the pushes quiet until its last report expires on the server.
+    const attentive = leaving ? false : pageHasAttention();
     if (!force && attentive === last) {
       return;
     }
@@ -282,10 +285,11 @@ export function installPresence(): () => void {
     });
   };
   const onChange = () => report(false);
+  const onLeave = () => report(false, true);
   document.addEventListener("visibilitychange", onChange);
   window.addEventListener("focus", onChange);
   window.addEventListener("blur", onChange);
-  window.addEventListener("pagehide", onChange);
+  window.addEventListener("pagehide", onLeave);
   const timer = window.setInterval(() => {
     if (pageHasAttention()) report(true);
   }, PRESENCE_EVERY_MS);
@@ -294,7 +298,7 @@ export function installPresence(): () => void {
     document.removeEventListener("visibilitychange", onChange);
     window.removeEventListener("focus", onChange);
     window.removeEventListener("blur", onChange);
-    window.removeEventListener("pagehide", onChange);
+    window.removeEventListener("pagehide", onLeave);
     window.clearInterval(timer);
   };
 }

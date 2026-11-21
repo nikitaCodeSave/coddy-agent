@@ -110,6 +110,7 @@ async function showPushed(event) {
     toolCallId: typeof notice.toolCallId === "string" ? notice.toolCallId : "",
     allow: typeof notice.allow === "string" ? notice.allow : "",
     reject: typeof notice.reject === "string" ? notice.reject : "",
+    device: typeof notice.device === "string" ? notice.device : "",
   };
   const options = {
     body: typeof notice.body === "string" ? notice.body : "",
@@ -134,7 +135,13 @@ async function showPushed(event) {
     options.requireInteraction = true;
   }
   await self.registration.showNotification(title, options);
-  await sendReceipt({ tag, kind: data.kind, sentAt: data.sentAt, receivedAt });
+  await sendReceipt({
+    tag,
+    kind: data.kind,
+    device: data.device,
+    sentAt: data.sentAt,
+    receivedAt,
+  });
 }
 
 async function sendReceipt(body) {
@@ -212,6 +219,7 @@ async function answerFromNotification(action, data) {
   }
   await sendReceipt({
     kind: data.kind,
+    device: data.device,
     sentAt: data.sentAt,
     action: ok ? action : action + "-failed",
   });

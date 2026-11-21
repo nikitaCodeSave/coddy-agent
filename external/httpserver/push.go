@@ -5,11 +5,13 @@ package httpserver
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"path/filepath"
 	"sort"
@@ -96,6 +98,8 @@ type pushNotice struct {
 	ToolCallID string `json:"toolCallId,omitempty"`
 	Allow      string `json:"allow,omitempty"`
 	Reject     string `json:"reject,omitempty"`
+	// Device is the subscription's device, which the receipt names back.
+	Device string `json:"device,omitempty"`
 }
 
 // pushSubscriptionRecord is one browser that asked for pushes.
@@ -476,16 +480,18 @@ func (p *pushService) sendAll(ev pushAttention, title string, targets []pushSubs
 // with the answer: a gone subscription is removed, a success is dated.
 func (p *pushService) sendOne(ctx context.Context, ev pushAttention, title string, rec pushSubscriptionRecord) bool {
 	notice := buildPushNotice(ev, title, rec.Lang)
+	notice.Device = rec.Device
 	notice.SentAt = p.now().UnixMilli()
 	start := p.now()
 	var (
 		res webpush.Result
 		err error
 	)
+	phases := &pushPhases{}
 	if p.deliver != nil {
 		res, err = p.deliver(ctx, rec, notice)
 	} else {
-		res, err = p.send(ctx, rec, notice, ev.Kind)
+		res, err = p.send(httptrace.WithClientTrace(ctx, phases.trace()), rec, notice, ev.Kind)
 	}
 	took := p.now().Sub(start)
 	if err != nil {
@@ -518,8 +524,56 @@ func (p *pushService) sendOne(ctx context.Context, ev pushAttention, title strin
 		"status", res.StatusCode,
 		"event_to_accept_ms", p.now().Sub(ev.At).Milliseconds(),
 		"request_ms", took.Milliseconds(),
+		"dns_ms", phases.dns.Milliseconds(),
+		"connect_ms", phases.connect.Milliseconds(),
+		"tls_ms", phases.tls.Milliseconds(),
+		"reused", phases.reused,
 	)
 	return true
+}
+
+// pushPhases measures where the time of one push request goes: a person waits
+// for all of it, and the first push to a push service also pays for the lookup
+// and the handshakes a pooled connection saves the next one.
+type pushPhases struct {
+	mu                      sync.Mutex
+	dnsAt, connectAt, tlsAt time.Time
+	dns, connect, tls       time.Duration
+	reused                  bool
+}
+
+func (ph *pushPhases) trace() *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		GotConn: func(info httptrace.GotConnInfo) {
+			ph.mu.Lock()
+			ph.reused = info.Reused
+			ph.mu.Unlock()
+		},
+		DNSStart: func(httptrace.DNSStartInfo) { ph.mark(&ph.dnsAt) },
+		DNSDone:  func(httptrace.DNSDoneInfo) { ph.since(&ph.dnsAt, &ph.dns) },
+		ConnectStart: func(string, string) {
+			ph.mark(&ph.connectAt)
+		},
+		ConnectDone:       func(string, string, error) { ph.since(&ph.connectAt, &ph.connect) },
+		TLSHandshakeStart: func() { ph.mark(&ph.tlsAt) },
+		TLSHandshakeDone: func(tls.ConnectionState, error) {
+			ph.since(&ph.tlsAt, &ph.tls)
+		},
+	}
+}
+
+func (ph *pushPhases) mark(at *time.Time) {
+	ph.mu.Lock()
+	*at = time.Now()
+	ph.mu.Unlock()
+}
+
+func (ph *pushPhases) since(at *time.Time, d *time.Duration) {
+	ph.mu.Lock()
+	if !at.IsZero() {
+		*d += time.Since(*at)
+	}
+	ph.mu.Unlock()
 }
 
 func (p *pushService) send(ctx context.Context, rec pushSubscriptionRecord, notice pushNotice, kind string) (webpush.Result, error) {
