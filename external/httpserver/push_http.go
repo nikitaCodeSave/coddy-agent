@@ -164,8 +164,13 @@ func (s *Server) pushReceiptPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attrs := []interface{}{"kind", limitText(body.Kind, 32), "device", limitText(body.Device, 64)}
+	if body.SentAt > 0 {
+		// The server's own clock on both ends: the phone's clock may be off by
+		// seconds. It includes the receipt's own trip, a few ms on a LAN.
+		attrs = append(attrs, "server_delivery_ms", time.Now().UnixMilli()-body.SentAt)
+	}
 	if body.SentAt > 0 && body.ReceivedAt > 0 {
-		attrs = append(attrs, "delivery_ms", body.ReceivedAt-body.SentAt)
+		attrs = append(attrs, "device_clock_delivery_ms", body.ReceivedAt-body.SentAt)
 	}
 	if a := limitText(body.Action, 16); a != "" {
 		attrs = append(attrs, "action", a, "action_after_send_ms", time.Now().UnixMilli()-body.SentAt)
